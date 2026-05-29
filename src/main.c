@@ -15,7 +15,7 @@
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
 
-#include "../include/speedtest.h"
+#include "speedtest.h"
 
 #define COL_RESET  "\033[0m"
 #define COL_BOLD   "\033[1m"

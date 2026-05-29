@@ -14,8 +14,8 @@
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
 
-#include "../include/speedtest.h"
-#include "../include/curl_helper.h"
+#include "speedtest.h"
+#include "curl_helper.h"
 
 /* ------------------------------------------------------------------ */
 /* ANSI colours                                                         */

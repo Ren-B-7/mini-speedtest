@@ -19,7 +19,7 @@
 
 #include <cjson/cJSON.h>
 
-#include "../include/speedtest.h"
+#include "speedtest.h"
 
 /* ------------------------------------------------------------------ */
 /* utility                                                              */

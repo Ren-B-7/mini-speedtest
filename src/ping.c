@@ -20,7 +20,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
-#include "../include/speedtest.h"
+#include "speedtest.h"
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                              */

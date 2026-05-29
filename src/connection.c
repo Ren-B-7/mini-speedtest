@@ -16,7 +16,7 @@
 
 #include <curl/curl.h>
 
-#include "../include/speedtest.h"
+#include "speedtest.h"
 
 /* Discard response body – we only care about timing */
 static size_t discard_cb(void *ptr, size_t size, size_t nmemb, void *ud)
