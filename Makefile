@@ -23,7 +23,8 @@ endif
 
 # --- Compiler Detection ---
 CC = gcc
-IS_GCC := $(shell $(CC) -v 2>&1 | grep -q "gcc" && echo 1 || echo 0)
+IS_CLANG := $(shell $(CC) --version 2>&1 | grep -q "clang" && echo 1 || echo 0)
+IS_GCC := $(shell [ $(IS_CLANG) -eq 0 ] && $(CC) -v 2>&1 | grep -q "gcc" && echo 1 || echo 0)
 
 # --- Compilation Flags ---
 POSIX_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
@@ -47,6 +48,18 @@ ifeq ($(IS_GCC),1)
                 -Wshadow -Wwrite-strings -Wfloat-equal -Wpointer-arith \
                 -Wbad-function-cast -Wold-style-definition
     CFLAGS += $(GCC_FLAGS)
+endif
+
+# Clang-specific warnings
+ifeq ($(IS_CLANG),1)
+    CLANG_FLAGS = -Wformat=2 -Wformat-security -Wnull-dereference -Wstack-protector \
+                  -Wvla -Wimplicit-fallthrough -Wcast-qual -Wcast-align \
+                  -Wconversion -Wsign-conversion -Wredundant-decls -Wshadow \
+                  -Wwrite-strings -Wfloat-equal -Wpointer-arith \
+                  -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations \
+                  -Winline -Wundef -Wextra-semi -Wcovered-switch-default \
+                  -Wswitch-enum -Wpacked -Wpadded
+    CFLAGS += $(CLANG_FLAGS)
 endif
 
 # Hardening flags (Linux only)
