@@ -116,10 +116,10 @@ Provider provider_from_string(const char* name)
     return PROVIDER_UNKNOWN;
 }
 
-const char* provider_to_string(Provider p)
+const char* provider_to_string(Provider provider)
 {
     for (int i = 0; i < PROVIDER_COUNT; i++) {
-        if (PROVIDERS[i].id == p) {
+        if (PROVIDERS[i].id == provider) {
             return PROVIDERS[i].name;
         }
     }
@@ -162,44 +162,51 @@ static void bar(double value, double max, int width, const char* colour)
     printf(COL_RESET);
 }
 
+#define PING_SCALE_MAX 200.0
+#define TTFB_GOOD_MS 200.0
+#define TTFB_WARN_MS 600.0
+#define TTFB_SCALE_MAX 1000.0
+#define VISUAL_BAR_WIDTH 20
+
 /* ------------------------------------------------------------------ */
 /* print_result                                                         */
 /* ------------------------------------------------------------------ */
-
-void print_result(const SpeedResult* r, const PingResult* pr,
- const ConnResult* cr)
+void print_result(const SpeedResult* result, const PingResult* ping_result,
+ const ConnResult* conn_result)
 {
-    if (!r->valid) {
+    if (!result->valid) {
         printf(COL_RED "  x Provider returned no usable data.\n" COL_RESET);
         return;
     }
 
-    printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Provider:", r->provider);
-    printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Public IP:", r->ip);
+    printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Provider:", result->provider);
+    printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Public IP:", result->ip);
 
-    if (r->city[0]) {
-        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "City:", r->city);
+    if (result->city[0]) {
+        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "City:", result->city);
     }
-    if (r->region[0]) {
-        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Region:", r->region);
+    if (result->region[0]) {
+        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Region:", result->region);
     }
-    if (r->country[0]) {
-        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Country:", r->country);
+    if (result->country[0]) {
+        printf(COL_BOLD "  %-12s" COL_RESET " %s\n",
+         "Country:", result->country);
     }
-    if (r->org[0]) {
-        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Org/ISP:", r->org);
+    if (result->org[0]) {
+        printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Org/ISP:", result->org);
     }
 
-    if (fabs(r->latitude) > EPSILON || fabs(r->longitude) > EPSILON) {
+    if (fabs(result->latitude) > EPSILON || fabs(result->longitude) > EPSILON) {
         printf(COL_BOLD "  %-12s" COL_RESET " %.4f, %.4f\n",
-         "Coords:", r->latitude, r->longitude);
+         "Coords:", result->latitude, result->longitude);
     }
 
     /* Ping */
     printf(COL_BOLD "  %-12s" COL_RESET " ", "Ping:");
-    if (pr && pr->reachable) {
-        printf(COL_GREEN "%.1f ms" COL_RESET "  ", pr->latency_ms);
-        bar(pr->latency_ms, 200.0, 20, COL_GREEN);
+    if (ping_result && ping_result->reachable) {
+        printf(COL_GREEN "%.1f ms" COL_RESET "  ", ping_result->latency_ms);
+        bar(ping_result->latency_ms, PING_SCALE_MAX, VISUAL_BAR_WIDTH,
+         COL_GREEN);
         printf("\n");
     } else {
         printf(COL_RED "unreachable\n" COL_RESET);
@@ -207,65 +214,70 @@ void print_result(const SpeedResult* r, const PingResult* pr,
 
     /* TTFB */
     printf(COL_BOLD "  %-12s" COL_RESET " ", "TTFB:");
-    if (cr && cr->success) {
-        const char* col = cr->ttfb_ms < 200 ?
-         COL_GREEN :
-         cr->ttfb_ms < 600 ?
-         COL_YELLOW :
-         COL_RED;
-        printf("%s%.0f ms" COL_RESET "  ", col, cr->ttfb_ms);
-        bar(cr->ttfb_ms, 1000.0, 20, col);
+    if (conn_result && conn_result->success) {
+        const char* col = COL_RED;
+        if (conn_result->ttfb_ms < TTFB_GOOD_MS) {
+            col = COL_GREEN;
+        } else if (conn_result->ttfb_ms < TTFB_WARN_MS) {
+            col = COL_YELLOW;
+        }
+
+        printf("%s%.0f ms" COL_RESET "  ", col, conn_result->ttfb_ms);
+        bar(conn_result->ttfb_ms, TTFB_SCALE_MAX, VISUAL_BAR_WIDTH, col);
         printf("\n");
         printf(COL_BOLD "  %-12s" COL_RESET " %.0f ms  (HTTP %ld)\n",
-         "Total:", cr->total_ms, cr->http_code);
+         "Total:", conn_result->total_ms, conn_result->http_code);
     } else {
         printf(COL_RED "unavailable\n" COL_RESET);
     }
 
-    if (r->download_mbps >= 0.0) {
+    if (result->download_mbps >= 0.0) {
         printf(COL_BOLD "  %-12s" COL_RESET COL_CYAN " %.1f Mbps\n" COL_RESET,
-         "Download:", r->download_mbps);
+         "Download:", result->download_mbps);
     }
-    if (r->upload_mbps >= 0.0) {
+    if (result->upload_mbps >= 0.0) {
         printf(COL_BOLD
          "  %-12s" COL_RESET COL_MAGENTA " %.1f "
          "Mbps\n" COL_RESET,
-         "Upload:", r->upload_mbps);
+         "Upload:", result->upload_mbps);
     }
 
     printf("\n");
 }
 
+#define DEFAULT_PING_COUNT 4
+#define DEFAULT_FETCH_TIMEOUT 10
+
 /* ------------------------------------------------------------------ */
 /* run_provider                                                         */
 /* ------------------------------------------------------------------ */
 
-SpeedResult run_provider(Provider p, const char* api_key)
+SpeedResult run_provider(Provider provider, const char* api_key)
 {
     (void)api_key;
-    SpeedResult r;
-    memset(&r, 0, sizeof r);
-    r.download_mbps = -1.0;
-    r.upload_mbps = -1.0;
-    r.ping_ms = -1.0;
+    SpeedResult result;
+    memset(&result, 0, sizeof result);
+    result.download_mbps = -1.0;
+    result.upload_mbps = -1.0;
+    result.ping_ms = -1.0;
 
     const ProviderDef* def = NULL;
     for (int i = 0; i < PROVIDER_COUNT; i++) {
-        if (PROVIDERS[i].id == p) {
+        if (PROVIDERS[i].id == provider) {
             def = &PROVIDERS[i];
             break;
         }
     }
     if (!def) {
-        strncpy(r.provider, "unknown", sizeof r.provider - 1);
-        return r;
+        strncpy(result.provider, "unknown", sizeof result.provider - 1);
+        return result;
     }
 
     printf(COL_BOLD COL_BLUE "\n[%s]" COL_RESET " Querying %s ...\n", def->name,
      def->url);
 
     /* 1. Connection quality metrics */
-    ConnResult cr = measure_connection(def->url);
+    ConnResult conn_result = measure_connection(def->url);
 
     printf("  Measuring download speed ... ");
     fflush(stdout);
@@ -276,26 +288,27 @@ SpeedResult run_provider(Provider p, const char* api_key)
         download_url = def->download_url_str;
     }
 
-    r.download_mbps = measure_download(download_url, def->download_headers);
-    printf("%.2f Mbps\n", r.download_mbps);
+    result.download_mbps =
+     measure_download(download_url, def->download_headers);
+    printf("%.2f Mbps\n", result.download_mbps);
 
     /* 2. Fetch body for parsing */
-    char* body = curl_get(def->url, def->accept, 10);
+    char* body = curl_get(def->url, def->accept, DEFAULT_FETCH_TIMEOUT);
 
     /* 3. Parse */
     if (body) {
-        r = def->parse(body);
+        result = def->parse(body);
         free(body);
     } else {
-        strncpy(r.provider, def->name, sizeof r.provider - 1);
+        strncpy(result.provider, def->name, sizeof result.provider - 1);
     }
 
     /* 4. TCP-ping */
-    PingResult pr = ping_host(def->ping_host_str, 4);
-    r.ping_ms = pr.reachable ? pr.latency_ms : -1.0;
+    PingResult ping_result = ping_host(def->ping_host_str, DEFAULT_PING_COUNT);
+    result.ping_ms = ping_result.reachable ? ping_result.latency_ms : -1.0;
 
     /* 5. Display */
-    print_result(&r, &pr, &cr);
+    print_result(&result, &ping_result, &conn_result);
 
-    return r;
+    return result;
 }

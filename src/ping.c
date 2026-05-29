@@ -19,21 +19,28 @@
 
 #include "speedtest.h"
 
+#define MS_PER_SEC 1000.0
+#define US_PER_MS 1000.0
+#define PING_GAP_NS 200000000L
+
 /* ------------------------------------------------------------------ */
 /* helpers                                                              */
 /* ------------------------------------------------------------------ */
 
 static double now_ms(void)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+    struct timeval time_val;
+    gettimeofday(&time_val, NULL);
+    return ((double)time_val.tv_sec * MS_PER_SEC) +
+     ((double)time_val.tv_usec / US_PER_MS);
 }
 
 static double tcp_connect_ms(const char* host, const char* port)
 {
-    struct addrinfo hints, *res, *rp;
-    int fd = -1;
+    struct addrinfo hints;
+    struct addrinfo* res;
+    struct addrinfo* addr_iter;
+    int socket_fd = -1;
     double elapsed = -1.0;
 
     memset(&hints, 0, sizeof hints);
@@ -46,18 +53,20 @@ static double tcp_connect_ms(const char* host, const char* port)
 
     double t_start = now_ms();
 
-    for (rp = res; rp; rp = rp->ai_next) {
-        fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (fd < 0) {
+    for (addr_iter = res; addr_iter; addr_iter = addr_iter->ai_next) {
+        socket_fd = socket(addr_iter->ai_family, addr_iter->ai_socktype,
+         addr_iter->ai_protocol);
+        if (socket_fd < 0) {
             continue;
         }
 
-        if (connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) {
+        if (connect(socket_fd, addr_iter->ai_addr, addr_iter->ai_addrlen) ==
+         0) {
             elapsed = now_ms() - t_start;
-            close(fd);
+            close(socket_fd);
             break;
         }
-        close(fd);
+        close(socket_fd);
     }
 
     freeaddrinfo(res);
@@ -80,30 +89,31 @@ PingResult ping_host(const char* host, int count)
     }
 
     strncpy(result.host, host, sizeof result.host - 1);
+    result.host[sizeof result.host - 1] = '\0';
 
     if (count < 1) {
         count = 4;
     }
 
     double total = 0.0;
-    int ok = 0;
+    int success_count = 0;
 
     for (int i = 0; i < count; i++) {
-        double ms = tcp_connect_ms(host, "443");
-        if (ms < 0.0) {
-            ms = tcp_connect_ms(host, "80");
+        double latency_ms = tcp_connect_ms(host, "443");
+        if (latency_ms < 0.0) {
+            latency_ms = tcp_connect_ms(host, "80");
         }
-        if (ms >= 0.0) {
-            total += ms;
-            ok++;
+        if (latency_ms >= 0.0) {
+            total += latency_ms;
+            success_count++;
         }
-        struct timespec ts = {0, 200000000L}; /* 200 ms gap */
-        nanosleep(&ts, NULL);
+        struct timespec gap_time = {0, PING_GAP_NS};
+        nanosleep(&gap_time, NULL);
     }
 
-    if (ok > 0) {
+    if (success_count > 0) {
         result.reachable = 1;
-        result.latency_ms = total / ok;
+        result.latency_ms = total / (double)success_count;
     } else {
         result.reachable = 0;
         result.latency_ms = -1.0;

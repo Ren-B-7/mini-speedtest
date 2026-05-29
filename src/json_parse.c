@@ -19,6 +19,10 @@
 
 #include "speedtest.h"
 
+#define POP_SUFFIX_LEN 7
+#define CLOUDFLARE_KEY_MAX 64
+#define CLOUDFLARE_VAL_MAX 256
+
 /* ------------------------------------------------------------------ */
 /* utility                                                              */
 /* ------------------------------------------------------------------ */
@@ -37,8 +41,8 @@ static void safe_str_pop(char* dst, size_t dstsz, const char* src)
         return;
     }
 
-    // Check if we have space for " (PoP)\0" which is 7 bytes
-    if (strlen(src) + 7 <= dstsz) {
+    // Check if we have space for " (PoP)\0"
+    if (strlen(src) + POP_SUFFIX_LEN <= dstsz) {
         snprintf(dst, dstsz, "%s (PoP)", src);
     } else {
         strncpy(dst, src, dstsz - 1);
@@ -59,43 +63,46 @@ static double safe_num(const cJSON* item, double fallback)
 /* ------------------------------------------------------------------ */
 SpeedResult parse_ipapi(const char* json)
 {
-    SpeedResult r;
-    memset(&r, 0, sizeof r);
-    strncpy(r.provider, "ip-api.com", sizeof r.provider - 1);
-    r.download_mbps = -1.0;
-    r.upload_mbps = -1.0;
-    r.ping_ms = -1.0;
+    SpeedResult result;
+    memset(&result, 0, sizeof result);
+    strncpy(result.provider, "ip-api.com", sizeof result.provider - 1);
+    result.download_mbps = -1.0;
+    result.upload_mbps = -1.0;
+    result.ping_ms = -1.0;
 
     if (!json) {
-        return r;
+        return result;
     }
 
-    cJSON* root = cJSON_Parse(json);
-    if (!root) {
-        return r;
+    cJSON* json_root = cJSON_Parse(json);
+    if (!json_root) {
+        return result;
     }
 
-    cJSON* status = cJSON_GetObjectItemCaseSensitive(root, "status");
+    cJSON* status = cJSON_GetObjectItemCaseSensitive(json_root, "status");
     if (!cJSON_IsString(status) ||
      strcmp(status->valuestring, "success") != 0) {
-        cJSON_Delete(root);
-        return r;
+        cJSON_Delete(json_root);
+        return result;
     }
 
-    safe_str(r.ip, sizeof r.ip, cJSON_GetObjectItem(root, "query"));
-    safe_str(r.city, sizeof r.city, cJSON_GetObjectItem(root, "city"));
-    safe_str(r.region, sizeof r.region,
-     cJSON_GetObjectItem(root, "regionName"));
-    safe_str(r.country, sizeof r.country,
-     cJSON_GetObjectItem(root, "countryCode"));
-    safe_str(r.org, sizeof r.org, cJSON_GetObjectItem(root, "isp"));
+    safe_str(result.ip, sizeof result.ip,
+     cJSON_GetObjectItem(json_root, "query"));
+    safe_str(result.city, sizeof result.city,
+     cJSON_GetObjectItem(json_root, "city"));
+    safe_str(result.region, sizeof result.region,
+     cJSON_GetObjectItem(json_root, "regionName"));
+    safe_str(result.country, sizeof result.country,
+     cJSON_GetObjectItem(json_root, "countryCode"));
+    safe_str(result.org, sizeof result.org,
+     cJSON_GetObjectItem(json_root, "isp"));
 
-    r.latitude = safe_num(cJSON_GetObjectItem(root, "lat"), 0.0);
-    r.longitude = safe_num(cJSON_GetObjectItem(root, "lon"), 0.0);
-    r.valid = 1;
+    result.latitude = safe_num(cJSON_GetObjectItem(json_root, "lat"), 0.0);
+    result.longitude = safe_num(cJSON_GetObjectItem(json_root, "lon"), 0.0);
+    result.valid = 1;
 
-    cJSON_Delete(root);
-    return r;
+    cJSON_Delete(json_root);
+    return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,42 +110,46 @@ SpeedResult parse_ipapi(const char* json)
 /* ------------------------------------------------------------------ */
 SpeedResult parse_ipinfo(const char* json)
 {
-    SpeedResult r;
-    memset(&r, 0, sizeof r);
-    strncpy(r.provider, "ipinfo.io", sizeof r.provider - 1);
-    r.download_mbps = -1.0;
-    r.upload_mbps = -1.0;
-    r.ping_ms = -1.0;
+    SpeedResult result;
+    memset(&result, 0, sizeof result);
+    strncpy(result.provider, "ipinfo.io", sizeof result.provider - 1);
+    result.download_mbps = -1.0;
+    result.upload_mbps = -1.0;
+    result.ping_ms = -1.0;
 
     if (!json) {
-        return r;
+        return result;
     }
 
-    cJSON* root = cJSON_Parse(json);
-    if (!root) {
-        return r;
+    cJSON* json_root = cJSON_Parse(json);
+    if (!json_root) {
+        return result;
     }
 
-    safe_str(r.ip, sizeof r.ip, cJSON_GetObjectItem(root, "ip"));
-    safe_str(r.city, sizeof r.city, cJSON_GetObjectItem(root, "city"));
-    safe_str(r.region, sizeof r.region, cJSON_GetObjectItem(root, "region"));
-    safe_str(r.country, sizeof r.country, cJSON_GetObjectItem(root, "country"));
-    safe_str(r.org, sizeof r.org, cJSON_GetObjectItem(root, "org"));
+    safe_str(result.ip, sizeof result.ip, cJSON_GetObjectItem(json_root, "ip"));
+    safe_str(result.city, sizeof result.city,
+     cJSON_GetObjectItem(json_root, "city"));
+    safe_str(result.region, sizeof result.region,
+     cJSON_GetObjectItem(json_root, "region"));
+    safe_str(result.country, sizeof result.country,
+     cJSON_GetObjectItem(json_root, "country"));
+    safe_str(result.org, sizeof result.org,
+     cJSON_GetObjectItem(json_root, "org"));
 
     /* "loc" is "lat,lon" as a single string */
-    cJSON* loc = cJSON_GetObjectItem(root, "loc");
+    cJSON* loc = cJSON_GetObjectItem(json_root, "loc");
     if (cJSON_IsString(loc) && loc->valuestring) {
         char* endptr;
-        r.latitude = strtod(loc->valuestring, &endptr);
+        result.latitude = strtod(loc->valuestring, &endptr);
         if (endptr != loc->valuestring && *endptr == ',') {
-            r.longitude = strtod(endptr + 1, NULL);
+            result.longitude = strtod(endptr + 1, NULL);
         }
     }
 
-    r.valid = (r.ip[0] != '\0');
+    result.valid = (result.ip[0] != '\0');
 
-    cJSON_Delete(root);
-    return r;
+    cJSON_Delete(json_root);
+    return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,45 +157,46 @@ SpeedResult parse_ipinfo(const char* json)
 /* ------------------------------------------------------------------ */
 SpeedResult parse_cloudflare(const char* raw)
 {
-    SpeedResult r;
-    memset(&r, 0, sizeof r);
-    strncpy(r.provider, "Cloudflare", sizeof r.provider - 1);
-    r.download_mbps = -1.0;
-    r.upload_mbps = -1.0;
-    r.ping_ms = -1.0;
+    SpeedResult result;
+    memset(&result, 0, sizeof result);
+    strncpy(result.provider, "Cloudflare", sizeof result.provider - 1);
+    result.download_mbps = -1.0;
+    result.upload_mbps = -1.0;
+    result.ping_ms = -1.0;
 
     if (!raw) {
-        return r;
+        return result;
     }
 
     char* buf = strdup(raw);
     if (!buf) {
-        return r;
+        return result;
     }
 
     char* line = strtok(buf, "\n");
     while (line) {
-        char key[64] = {0}, val[256] = {0};
+        char key[CLOUDFLARE_KEY_MAX] = {0};
+        char val[CLOUDFLARE_VAL_MAX] = {0};
         if (sscanf(line, "%63[^=]=%255s", key, val) == 2) {
             if (strcmp(key, "ip") == 0) {
-                strncpy(r.ip, val, sizeof r.ip - 1);
-                r.ip[sizeof r.ip - 1] = '\0';
+                strncpy(result.ip, val, sizeof result.ip - 1);
+                result.ip[sizeof result.ip - 1] = '\0';
             } else if (strcmp(key, "loc") == 0) {
-                strncpy(r.country, val, sizeof r.country - 1);
-                r.country[sizeof r.country - 1] = '\0';
+                strncpy(result.country, val, sizeof result.country - 1);
+                result.country[sizeof result.country - 1] = '\0';
             } else if (strcmp(key, "colo") == 0) {
-                safe_str_pop(r.city, sizeof r.city, val);
+                safe_str_pop(result.city, sizeof result.city, val);
             } else if (strcmp(key, "org") == 0) {
-                strncpy(r.org, val, sizeof r.org - 1);
-                r.org[sizeof r.org - 1] = '\0';
+                strncpy(result.org, val, sizeof result.org - 1);
+                result.org[sizeof result.org - 1] = '\0';
             }
         }
         line = strtok(NULL, "\n");
     }
 
     free(buf);
-    r.valid = (r.ip[0] != '\0');
-    return r;
+    result.valid = (result.ip[0] != '\0');
+    return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -192,41 +204,43 @@ SpeedResult parse_cloudflare(const char* raw)
 /* ------------------------------------------------------------------ */
 SpeedResult parse_fastly(const char* json)
 {
-    SpeedResult r;
-    memset(&r, 0, sizeof r);
-    strncpy(r.provider, "Fastly", sizeof r.provider - 1);
-    r.download_mbps = -1.0;
-    r.upload_mbps = -1.0;
-    r.ping_ms = -1.0;
+    SpeedResult result;
+    memset(&result, 0, sizeof result);
+    strncpy(result.provider, "Fastly", sizeof result.provider - 1);
+    result.download_mbps = -1.0;
+    result.upload_mbps = -1.0;
+    result.ping_ms = -1.0;
 
     if (!json) {
-        return r;
+        return result;
     }
 
-    cJSON* root = cJSON_Parse(json);
-    if (!root) {
-        return r;
+    cJSON* json_root = cJSON_Parse(json);
+    if (!json_root) {
+        return result;
     }
 
-    safe_str(r.ip, sizeof r.ip, cJSON_GetObjectItem(root, "client_ip"));
+    safe_str(result.ip, sizeof result.ip,
+     cJSON_GetObjectItem(json_root, "client_ip"));
 
-    cJSON* geo = cJSON_GetObjectItem(root, "pop_geolocation");
+    cJSON* geo = cJSON_GetObjectItem(json_root, "pop_geolocation");
     if (geo) {
-        safe_str(r.city, sizeof r.city, cJSON_GetObjectItem(geo, "city"));
-        safe_str(r.country, sizeof r.country,
+        safe_str(result.city, sizeof result.city,
+         cJSON_GetObjectItem(geo, "city"));
+        safe_str(result.country, sizeof result.country,
          cJSON_GetObjectItem(geo, "country"));
-        r.latitude = safe_num(cJSON_GetObjectItem(geo, "latitude"), 0.0);
-        r.longitude = safe_num(cJSON_GetObjectItem(geo, "longitude"), 0.0);
+        result.latitude = safe_num(cJSON_GetObjectItem(geo, "latitude"), 0.0);
+        result.longitude = safe_num(cJSON_GetObjectItem(geo, "longitude"), 0.0);
     }
 
-    cJSON* asn = cJSON_GetObjectItem(root, "as_number");
+    cJSON* asn = cJSON_GetObjectItem(json_root, "as_number");
     if (cJSON_IsNumber(asn)) {
-        snprintf(r.org, sizeof r.org, "AS%d", (int)asn->valuedouble);
+        snprintf(result.org, sizeof result.org, "AS%d", (int)asn->valuedouble);
     }
 
-    r.valid = (r.ip[0] != '\0');
-    cJSON_Delete(root);
-    return r;
+    result.valid = (result.ip[0] != '\0');
+    cJSON_Delete(json_root);
+    return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -234,35 +248,35 @@ SpeedResult parse_fastly(const char* json)
 /* ------------------------------------------------------------------ */
 SpeedResult parse_httpbin(const char* json)
 {
-    SpeedResult r;
-    memset(&r, 0, sizeof r);
-    strncpy(r.provider, "httpbin.org", sizeof r.provider - 1);
-    r.download_mbps = -1.0;
-    r.upload_mbps = -1.0;
-    r.ping_ms = -1.0;
+    SpeedResult result;
+    memset(&result, 0, sizeof result);
+    strncpy(result.provider, "httpbin.org", sizeof result.provider - 1);
+    result.download_mbps = -1.0;
+    result.upload_mbps = -1.0;
+    result.ping_ms = -1.0;
 
     if (!json) {
-        return r;
+        return result;
     }
 
-    cJSON* root = cJSON_Parse(json);
-    if (!root) {
-        return r;
+    cJSON* json_root = cJSON_Parse(json);
+    if (!json_root) {
+        return result;
     }
 
-    cJSON* origin = cJSON_GetObjectItem(root, "origin");
+    cJSON* origin = cJSON_GetObjectItem(json_root, "origin");
     if (cJSON_IsString(origin) && origin->valuestring) {
-        strncpy(r.ip, origin->valuestring, sizeof r.ip - 1);
-        r.ip[sizeof r.ip - 1] = '\0';
-        char* comma = strchr(r.ip, ',');
+        strncpy(result.ip, origin->valuestring, sizeof result.ip - 1);
+        result.ip[sizeof result.ip - 1] = '\0';
+        char* comma = strchr(result.ip, ',');
         if (comma) {
             *comma = '\0';
         }
     }
 
-    snprintf(r.org, sizeof r.org, "echo test (no geo)");
+    snprintf(result.org, sizeof result.org, "echo test (no geo)");
 
-    r.valid = (r.ip[0] != '\0');
-    cJSON_Delete(root);
-    return r;
+    result.valid = (result.ip[0] != '\0');
+    cJSON_Delete(json_root);
+    return result;
 }

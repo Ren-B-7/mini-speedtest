@@ -17,16 +17,18 @@
 
 #include "speedtest.h"
 
+#define MAX_DOWNLOAD_SIZE ((size_t)15 * 1024 * 1024)
+
 /* Download callback to discard data but count bytes */
-static size_t download_cb(void* ptr, size_t size, size_t nmemb, void* ud)
+static size_t download_cb(void* ptr, size_t size, size_t nmemb, void* user_data)
 {
     size_t bytes = size * nmemb;
-    size_t* total_bytes = (size_t*)ud;
+    size_t* total_bytes = (size_t*)user_data;
     *total_bytes += bytes;
     (void)ptr;
 
-    // Stop downloading if we've reached 15MB (15 * 1024 * 1024 bytes)
-    if (*total_bytes >= 15 * 1024 * 1024) {
+    // Stop downloading if we've reached 15MB
+    if (*total_bytes >= MAX_DOWNLOAD_SIZE) {
         return 0; // Returning 0 aborts the transfer
     }
 
@@ -34,10 +36,10 @@ static size_t download_cb(void* ptr, size_t size, size_t nmemb, void* ud)
 }
 
 /* Discard response body – we only care about timing */
-static size_t discard_cb(void* ptr, size_t size, size_t nmemb, void* ud)
+static size_t discard_cb(void* ptr, size_t size, size_t nmemb, void* user_data)
 {
     (void)ptr;
-    (void)ud;
+    (void)user_data;
     return size * nmemb;
 }
 
