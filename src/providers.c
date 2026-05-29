@@ -219,6 +219,7 @@ void print_result(const SpeedResult* r, const PingResult* pr,
 
 SpeedResult run_provider(Provider p, const char* api_key)
 {
+    (void)api_key;
     SpeedResult r;
     memset(&r, 0, sizeof r);
     r.download_mbps = -1.0;

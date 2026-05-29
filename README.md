@@ -44,6 +44,7 @@ Options:
   --ping-only         Only run TCP-connect ping test
   --json              Output results as JSON
   --count=<n>         Ping probes per host (default: 4)
+  --api-key=<key>     API key for providers
   --help              Show this help
 ```
 

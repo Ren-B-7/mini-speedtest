@@ -48,7 +48,6 @@ static void usage(const char* argv0)
      "  " COL_CYAN "--help" COL_RESET "               Show this help\n"
      "\n",
      argv0);
-    list_providers();
 }
 
 /* ------------------------------------------------------------------ */
