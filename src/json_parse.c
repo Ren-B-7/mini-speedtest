@@ -41,13 +41,11 @@ static void safe_str_pop(char* dst, size_t dstsz, const char* src)
         return;
     }
 
-    // Check if we have space for " (PoP)\0"
-    if (strlen(src) + POP_SUFFIX_LEN <= dstsz) {
-        snprintf(dst, dstsz, "%s (PoP)", src);
-    } else {
-        strncpy(dst, src, dstsz - 1);
-        dst[dstsz - 1] = '\0';
-    }
+    // Use a temporary buffer to avoid truncation warnings
+    char tmp[512];
+    snprintf(tmp, sizeof(tmp), "%s (PoP)", src);
+    strncpy(dst, tmp, dstsz - 1);
+    dst[dstsz - 1] = '\0';
 }
 
 static double safe_num(const cJSON* item, double fallback)

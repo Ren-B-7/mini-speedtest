@@ -80,8 +80,13 @@ ifeq ($(PROFILE),release)
     LDFLAGS += -s
 else ifeq ($(PROFILE),fast)
     OPTFLAGS = -O3 -march=native -flto
+    LDFLAGS += -s
 else ifeq ($(PROFILE),tiny)
     OPTFLAGS = -Os -flto
+    LDFLAGS += -s
+else ifeq ($(PROFILE),minimal)
+    OPTFLAGS = -Os -DMINIMAL
+    LDFLAGS += -s
 else
     # dev (default)
     OPTFLAGS = -O0 -g
@@ -107,6 +112,9 @@ OBJS = $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 TARGET = $(BIN_DIR)/$(TARGET_NAME)-$(PROFILE)$(EXE_SUFFIX)
 LDFLAGS += -lcurl -lcjson -pthread
 
+# Strip tool
+STRIP ?= strip
+
 .PHONY: all clean directories format lint pgo-gen pgo-use install uninstall
 
 all: directories $(TARGET)
@@ -116,6 +124,10 @@ directories:
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
+	@if [ "$(PROFILE)" = "release" ] || [ "$(PROFILE)" = "fast" ] || [ "$(PROFILE)" = "tiny" ] || [ "$(PROFILE)" = "minimal" ]; then \
+		echo "Stripping $(TARGET)"; \
+		$(STRIP) $@; \
+	fi
 
 $(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
