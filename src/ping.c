@@ -4,8 +4,6 @@
  * Real ICMP ping requires elevated privileges.  We measure TCP-connect
  * latency to port 443/80 instead - accurate proxy for RTT, no root needed.
  */
-#define _POSIX_C_SOURCE 200112L /* getaddrinfo, freeaddrinfo, nanosleep */
-#define _DEFAULT_SOURCE         /* strdup */
 
 #include <arpa/inet.h>
 #include <errno.h>

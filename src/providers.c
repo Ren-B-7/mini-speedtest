@@ -5,7 +5,6 @@
  * and parser function pointer.  run_provider() wires everything together:
  * fetch -> parse -> ping -> connection metrics -> print.
  */
-#define _DEFAULT_SOURCE /* strdup */
 
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
@@ -235,6 +234,11 @@ SpeedResult run_provider(Provider p)
 
     /* 1. Connection quality metrics */
     ConnResult cr = measure_connection(def->url);
+    
+    printf("  Measuring download speed ... ");
+    fflush(stdout);
+    r.download_mbps = measure_download(def->url);
+    printf("%.2f Mbps\n", r.download_mbps);
 
     /* 2. Fetch body for parsing */
     char* body = curl_get(def->url, def->accept, 10);

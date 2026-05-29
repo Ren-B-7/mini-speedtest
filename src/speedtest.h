@@ -58,6 +58,7 @@ PingResult ping_host(const char* host, int count);
 
 /* connection.c */
 ConnResult measure_connection(const char* url);
+double measure_download(const char* url);
 
 /* json_parse.c */
 SpeedResult parse_ipapi(const char* json);

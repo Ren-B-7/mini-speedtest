@@ -11,7 +11,6 @@
  *   Fastly       -> JSON from their free CDN-info API
  *   httpbin.org  -> JSON echo (we read "origin" for the IP)
  */
-#define _DEFAULT_SOURCE /* strdup */
 
 #include <cjson/cJSON.h>
 #include <stdio.h>
@@ -27,7 +26,21 @@
 static void safe_str(char* dst, size_t dstsz, const cJSON* item)
 {
     if (cJSON_IsString(item) && item->valuestring) {
-        snprintf(dst, dstsz, "%s", item->valuestring);
+        strncpy(dst, item->valuestring, dstsz - 1);
+        dst[dstsz - 1] = '\0';
+    }
+}
+
+static void safe_str_pop(char* dst, size_t dstsz, const char* src)
+{
+    if (!src) return;
+    
+    // Check if we have space for " (PoP)\0" which is 7 bytes
+    if (strlen(src) + 7 <= dstsz) {
+        snprintf(dst, dstsz, "%s (PoP)", src);
+    } else {
+        strncpy(dst, src, dstsz - 1);
+        dst[dstsz - 1] = '\0';
     }
 }
 
@@ -152,13 +165,16 @@ SpeedResult parse_cloudflare(const char* raw)
         char key[64] = {0}, val[256] = {0};
         if (sscanf(line, "%63[^=]=%255s", key, val) == 2) {
             if (strcmp(key, "ip") == 0) {
-                snprintf(r.ip, sizeof r.ip, "%s", val);
+                strncpy(r.ip, val, sizeof r.ip - 1);
+                r.ip[sizeof r.ip - 1] = '\0';
             } else if (strcmp(key, "loc") == 0) {
-                snprintf(r.country, sizeof r.country, "%s", val);
+                strncpy(r.country, val, sizeof r.country - 1);
+                r.country[sizeof r.country - 1] = '\0';
             } else if (strcmp(key, "colo") == 0) {
-                snprintf(r.city, sizeof r.city, "%s (PoP)", val);
+                safe_str_pop(r.city, sizeof r.city, val);
             } else if (strcmp(key, "org") == 0) {
-                snprintf(r.org, sizeof r.org, "%s", val);
+                strncpy(r.org, val, sizeof r.org - 1);
+                r.org[sizeof r.org - 1] = '\0';
             }
         }
         line = strtok(NULL, "\n");
@@ -234,13 +250,12 @@ SpeedResult parse_httpbin(const char* json)
 
     cJSON* origin = cJSON_GetObjectItem(root, "origin");
     if (cJSON_IsString(origin) && origin->valuestring) {
-        char tmp[128] = {0};
-        snprintf(tmp, sizeof tmp, "%s", origin->valuestring);
-        char* comma = strchr(tmp, ',');
+        strncpy(r.ip, origin->valuestring, sizeof r.ip - 1);
+        r.ip[sizeof r.ip - 1] = '\0';
+        char* comma = strchr(r.ip, ',');
         if (comma) {
             *comma = '\0';
         }
-        snprintf(r.ip, sizeof r.ip, "%s", tmp);
     }
 
     snprintf(r.org, sizeof r.org, "echo test (no geo)");
