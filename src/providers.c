@@ -55,21 +55,19 @@ static const ProviderDef PROVIDERS[] = {
         "http://ip-api.com/json/?fields=status,message,country,countryCode,"
         "regionName,city,lat,lon,isp,org,query",
         NULL, "ip-api.com", "Accept: application/json", parse_ipapi},
-    {PROVIDER_IPINFO, "ipinfo.io", "ipinfo", "https://ipinfo.io/json",
-        NULL, "ipinfo.io", "Accept: application/json", parse_ipinfo},
+    {PROVIDER_IPINFO, "ipinfo.io", "ipinfo", "https://ipinfo.io/json", NULL,
+        "ipinfo.io", "Accept: application/json", parse_ipinfo},
     {PROVIDER_CLOUDFLARE, "Cloudflare trace", "cloudflare",
         "https://one.one.one.one/cdn-cgi/trace",
-        "https://speed.cloudflare.com/__down?bytes=15728640",
-        "one.one.one.one", NULL,
-        parse_cloudflare},
+        "https://speed.cloudflare.com/__down?bytes=15728640", "one.one.one.one",
+        NULL, parse_cloudflare},
     {PROVIDER_FASTLY, "Fastly edge", "fastly",
         "https://api.fastly.com/public-ip-list",
         "https://speedtest.nyc1.fastly.net/download?size=15728640",
-        "api.fastly.com",
-        "Accept: application/json", parse_fastly},
+        "api.fastly.com", "Accept: application/json", parse_fastly},
     {PROVIDER_HTTPBIN, "httpbin.org", "httpbin", "https://httpbin.org/get",
-        "https://httpbin.org/stream-bytes/15728640",
-        "httpbin.org", "Accept: application/json", parse_httpbin},
+        "https://httpbin.org/stream-bytes/15728640", "httpbin.org",
+        "Accept: application/json", parse_httpbin},
 };
 
 static const int PROVIDER_COUNT = (int)(sizeof PROVIDERS / sizeof PROVIDERS[0]);
@@ -247,13 +245,13 @@ SpeedResult run_provider(Provider p, const char* api_key)
 
     printf("  Measuring download speed ... ");
     fflush(stdout);
-    
+
     // Use large file endpoint if available
     const char* download_url = def->url;
     if (def->download_url_str != NULL) {
         download_url = def->download_url_str;
     }
-    
+
     r.download_mbps = measure_download(download_url);
     printf("%.2f Mbps\n", r.download_mbps);
 
