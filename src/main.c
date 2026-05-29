@@ -44,6 +44,7 @@ static void usage(const char* argv0)
      "  " COL_CYAN "--json" COL_RESET "               Output results as JSON\n"
      "  " COL_CYAN "--count=<n>" COL_RESET "          Ping probes per host "
      "(default: 4)\n"
+     "  " COL_CYAN "--api-key=<key>" COL_RESET "      API key for providers\n"
      "  " COL_CYAN "--help" COL_RESET "               Show this help\n"
      "\n",
      argv0);
@@ -155,6 +156,7 @@ int main(int argc, char* argv[])
     int ping_only = 0;
     int json_mode = 0;
     int count = 4;
+    const char* api_key = NULL;
 
     for (int i = 1; i < argc; i++) {
         const char* arg = argv[i];
@@ -201,6 +203,10 @@ int main(int argc, char* argv[])
             }
             continue;
         }
+        if (strncmp(arg, "--api-key=", 10) == 0) {
+            api_key = arg + 10;
+            continue;
+        }
 
         fprintf(stderr, "Unknown option: %s\n", arg);
         usage(argv[0]);
@@ -224,7 +230,7 @@ int main(int argc, char* argv[])
 
     if (chosen == PROVIDER_ALL) {
         for (int p = PROVIDER_IPAPI; p < PROVIDER_ALL; p++) {
-            SpeedResult r = run_provider((Provider)p);
+            SpeedResult r = run_provider((Provider)p, api_key);
             if (json_mode) {
                 PingResult pr;
                 memset(&pr, 0, sizeof pr);
@@ -234,7 +240,7 @@ int main(int argc, char* argv[])
             }
         }
     } else {
-        SpeedResult r = run_provider(chosen);
+        SpeedResult r = run_provider(chosen, api_key);
         if (json_mode) {
             PingResult pr;
             memset(&pr, 0, sizeof pr);

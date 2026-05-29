@@ -70,7 +70,7 @@ SpeedResult parse_httpbin(const char* json);
 /* providers.c */
 Provider provider_from_string(const char* name);
 const char* provider_to_string(Provider p);
-SpeedResult run_provider(Provider p);
+SpeedResult run_provider(Provider p, const char* api_key);
 void print_result(const SpeedResult* r, const PingResult* pr,
  const ConnResult* cr);
 void list_providers(void);

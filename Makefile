@@ -22,9 +22,11 @@ else
 endif
 
 # --- Compiler Detection ---
-CC = gcc
-IS_CLANG := $(shell $(CC) --version 2>&1 | grep -q "clang" && echo 1 || echo 0)
-IS_GCC := $(shell [ $(IS_CLANG) -eq 0 ] && $(CC) -v 2>&1 | grep -q "gcc" && echo 1 || echo 0)
+CC ?= gcc
+
+IS_CLANG := $(shell $(CC) -E -dM - < /dev/null | grep -q "__clang__" && echo 1 || echo 0)
+IS_GCC   := $(shell $(CC) -E -dM - < /dev/null | grep -q "__GNUC__" && [ $(IS_CLANG) -eq 0 ] && echo 1 || echo 0)
+
 
 # --- Compilation Flags ---
 POSIX_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
@@ -35,30 +37,26 @@ else
 endif
 
 # Strict compilation flags
-CFLAGS = -std=c99 $(POSIX_FLAGS) -pedantic -Wall -Wextra -Isrc -Isrc/include $(DARWIN_FLAGS)
+COMMON_WARNINGS = -Wformat=2 -Wformat-security -Wnull-dereference -Wstack-protector \
+                  -Wvla -Wcast-qual -Wconversion -Wsign-conversion -Wredundant-decls \
+                  -Wshadow -Wwrite-strings -Wfloat-equal -Wpointer-arith \
+                  -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations \
+                  -Winline -Wundef
+CFLAGS = -std=c99 $(POSIX_FLAGS) -pedantic -Wall -Wextra -Isrc -Isrc/include $(DARWIN_FLAGS) $(COMMON_WARNINGS)
 
 # GCC-specific warnings
 ifeq ($(IS_GCC),1)
-    GCC_FLAGS = -Wformat=2 -Wformat-security -Wnull-dereference -Wstack-protector \
-                -Wtrampolines -Walloca -Wvla -Warray-bounds=2 -Wimplicit-fallthrough=3 \
-                -Wshift-overflow=2 -Wcast-qual -Wcast-align=strict -Wconversion \
-                -Wsign-conversion -Wlogical-op -Wduplicated-cond -Wduplicated-branches \
-                -Wrestrict -Wnested-externs -Winline -Wundef -Wstrict-prototypes \
-                -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
-                -Wshadow -Wwrite-strings -Wfloat-equal -Wpointer-arith \
-                -Wbad-function-cast -Wold-style-definition
+    GCC_FLAGS = -Wtrampolines -Walloca -Warray-bounds=2 -Wimplicit-fallthrough=3 \
+                -Wshift-overflow=2 -Wcast-align=strict -Wlogical-op -Wduplicated-cond \
+                -Wduplicated-branches -Wrestrict -Wnested-externs -Wbad-function-cast \
+                -Wold-style-definition
     CFLAGS += $(GCC_FLAGS)
 endif
 
 # Clang-specific warnings
 ifeq ($(IS_CLANG),1)
-    CLANG_FLAGS = -Wformat=2 -Wformat-security -Wnull-dereference -Wstack-protector \
-                  -Wvla -Wimplicit-fallthrough -Wcast-qual -Wcast-align \
-                  -Wconversion -Wsign-conversion -Wredundant-decls -Wshadow \
-                  -Wwrite-strings -Wfloat-equal -Wpointer-arith \
-                  -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations \
-                  -Winline -Wundef -Wextra-semi -Wcovered-switch-default \
-                  -Wswitch-enum -Wpacked -Wpadded
+    CLANG_FLAGS = -Wimplicit-fallthrough -Wcast-align -Wextra-semi \
+                  -Wcovered-switch-default -Wswitch-enum -Wpacked -Wpadded
     CFLAGS += $(CLANG_FLAGS)
 endif
 

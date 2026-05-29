@@ -40,6 +40,7 @@ typedef struct {
     const char* name;
     const char* slug;
     const char* url;
+    const char* download_url_str;
     const char* ping_host_str;
     const char* accept;
     SpeedResult (*parse)(const char* body);
@@ -53,16 +54,21 @@ static const ProviderDef PROVIDERS[] = {
     {PROVIDER_IPAPI, "ip-api.com", "ipapi",
         "http://ip-api.com/json/?fields=status,message,country,countryCode,"
         "regionName,city,lat,lon,isp,org,query",
-        "ip-api.com", "Accept: application/json", parse_ipapi},
+        NULL, "ip-api.com", "Accept: application/json", parse_ipapi},
     {PROVIDER_IPINFO, "ipinfo.io", "ipinfo", "https://ipinfo.io/json",
-        "ipinfo.io", "Accept: application/json", parse_ipinfo},
+        NULL, "ipinfo.io", "Accept: application/json", parse_ipinfo},
     {PROVIDER_CLOUDFLARE, "Cloudflare trace", "cloudflare",
-        "https://one.one.one.one/cdn-cgi/trace", "one.one.one.one", NULL,
+        "https://one.one.one.one/cdn-cgi/trace",
+        "https://speed.cloudflare.com/__down?bytes=15728640",
+        "one.one.one.one", NULL,
         parse_cloudflare},
     {PROVIDER_FASTLY, "Fastly edge", "fastly",
-        "https://api.fastly.com/public-ip-list", "api.fastly.com",
+        "https://api.fastly.com/public-ip-list",
+        "https://speedtest.nyc1.fastly.net/download?size=15728640",
+        "api.fastly.com",
         "Accept: application/json", parse_fastly},
     {PROVIDER_HTTPBIN, "httpbin.org", "httpbin", "https://httpbin.org/get",
+        "https://httpbin.org/stream-bytes/15728640",
         "httpbin.org", "Accept: application/json", parse_httpbin},
 };
 
@@ -213,7 +219,7 @@ void print_result(const SpeedResult* r, const PingResult* pr,
 /* run_provider                                                         */
 /* ------------------------------------------------------------------ */
 
-SpeedResult run_provider(Provider p)
+SpeedResult run_provider(Provider p, const char* api_key)
 {
     SpeedResult r;
     memset(&r, 0, sizeof r);
@@ -241,7 +247,14 @@ SpeedResult run_provider(Provider p)
 
     printf("  Measuring download speed ... ");
     fflush(stdout);
-    r.download_mbps = measure_download(def->url);
+    
+    // Use large file endpoint if available
+    const char* download_url = def->url;
+    if (def->download_url_str != NULL) {
+        download_url = def->download_url_str;
+    }
+    
+    r.download_mbps = measure_download(download_url);
     printf("%.2f Mbps\n", r.download_mbps);
 
     /* 2. Fetch body for parsing */
