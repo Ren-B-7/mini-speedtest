@@ -8,12 +8,15 @@
 
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "curl_helper.h"
 #include "speedtest.h"
+
+#define EPSILON 0.0001
 
 /* ------------------------------------------------------------------ */
 /* ANSI colours                                                         */
@@ -160,7 +163,7 @@ void print_result(const SpeedResult* r, const PingResult* pr,
         printf(COL_BOLD "  %-12s" COL_RESET " %s\n", "Org/ISP:", r->org);
     }
 
-    if (r->latitude != 0.0 || r->longitude != 0.0) {
+    if (fabs(r->latitude) > EPSILON || fabs(r->longitude) > EPSILON) {
         printf(COL_BOLD "  %-12s" COL_RESET " %.4f, %.4f\n",
          "Coords:", r->latitude, r->longitude);
     }

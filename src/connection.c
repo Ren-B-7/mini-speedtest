@@ -24,6 +24,12 @@ static size_t download_cb(void* ptr, size_t size, size_t nmemb, void* ud)
     size_t* total_bytes = (size_t*)ud;
     *total_bytes += bytes;
     (void)ptr;
+    
+    // Stop downloading if we've reached 15MB (15 * 1024 * 1024 bytes)
+    if (*total_bytes >= 15 * 1024 * 1024) {
+        return 0; // Returning 0 aborts the transfer
+    }
+    
     return bytes;
 }
 
@@ -48,7 +54,9 @@ double measure_download(const char* url)
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, download_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &total_bytes);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L); // 5s test
+    
+    // Set a 10s hard timeout
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); 
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "speedtest-cli/1.0");
 
@@ -66,7 +74,8 @@ double measure_download(const char* url)
 
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK || duration <= 0) {
+    // Accept CURLE_WRITE_ERROR because it's how we abort early
+    if ((res != CURLE_OK && res != CURLE_WRITE_ERROR) || duration <= 0) {
         return -1.0;
     }
 
