@@ -55,11 +55,9 @@ static double tcp_connect_ms(const char* host, const char* port)
         if (connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) {
             elapsed = now_ms() - t_start;
             close(fd);
-            fd = -1;
             break;
         }
         close(fd);
-        fd = -1;
     }
 
     freeaddrinfo(res);
