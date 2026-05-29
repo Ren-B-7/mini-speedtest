@@ -78,18 +78,23 @@ endif
 ifeq ($(PROFILE),release)
     OPTFLAGS = -Os -march=x86-64 -flto
     LDFLAGS += -s
+    STRIP_BINARY = 1
 else ifeq ($(PROFILE),fast)
     OPTFLAGS = -O3 -march=native -flto
     LDFLAGS += -s
+    STRIP_BINARY = 1
 else ifeq ($(PROFILE),tiny)
     OPTFLAGS = -Os -flto
     LDFLAGS += -s
+    STRIP_BINARY = 1
 else ifeq ($(PROFILE),minimal)
     OPTFLAGS = -Os -DMINIMAL
     LDFLAGS += -s
+    STRIP_BINARY = 1
 else
     # dev (default)
     OPTFLAGS = -O0 -g
+    STRIP_BINARY = 0
 endif
 
 CFLAGS += $(OPTFLAGS)
@@ -115,17 +120,27 @@ LDFLAGS += -lcurl -lcjson -pthread
 # Strip tool
 STRIP ?= strip
 
-.PHONY: all clean directories format lint pgo-gen pgo-use install uninstall
+.PHONY: all clean directories format lint pgo-gen pgo-use install uninstall compile-all
 
 all: directories $(TARGET)
+
+# Compile all profiles
+compile-all:
+	@echo "Compiling all profiles..."
+	@$(MAKE) PROFILE=dev directories $(BIN_DIR)/$(TARGET_NAME)-dev$(EXE_SUFFIX)
+	@$(MAKE) PROFILE=release directories $(BIN_DIR)/$(TARGET_NAME)-release$(EXE_SUFFIX)
+	@$(MAKE) PROFILE=fast directories $(BIN_DIR)/$(TARGET_NAME)-fast$(EXE_SUFFIX)
+	@$(MAKE) PROFILE=tiny directories $(BIN_DIR)/$(TARGET_NAME)-tiny$(EXE_SUFFIX)
+	@$(MAKE) PROFILE=minimal directories $(BIN_DIR)/$(TARGET_NAME)-minimal$(EXE_SUFFIX)
+	@echo "All profiles compiled in $(BIN_DIR)/"
 
 directories:
 	@mkdir -p $(BUILD_DIR) $(BIN_DIR)
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
-	@if [ "$(PROFILE)" = "release" ] || [ "$(PROFILE)" = "fast" ] || [ "$(PROFILE)" = "tiny" ] || [ "$(PROFILE)" = "minimal" ]; then \
-		echo "Stripping $(TARGET)"; \
+	@if [ "$(STRIP_BINARY)" = "1" ]; then \
+		echo "Stripping $@"; \
 		$(STRIP) $@; \
 	fi
 
@@ -152,10 +167,33 @@ pgo-use:
 	@$(MAKE) PGO_USE=1 clean all
 
 # Installation
-install: all
-	mkdir -p $(INSTALL_DIR)
-	install -m 755 $(TARGET) $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)
-	@echo "Installed $(TARGET) to $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)"
+# Interactive install target that detects available binaries (based on Makefile-temp pattern)
+install:
+	@binaries=$$(ls $(BIN_DIR)/$(TARGET_NAME)-* 2>/dev/null | xargs -n1 basename 2>/dev/null); \
+	if [ -z "$$binaries" ]; then \
+		echo "ERROR: No binaries found in $(BIN_DIR)/. Run 'make' or 'make compile-all' first."; \
+		exit 1; \
+	fi; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "Available Binaries to Install:"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	i=1; \
+	for b in $$binaries; do \
+		echo "$$i. $$b"; \
+		i=$$(($$i + 1)); \
+	done; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	printf "Select a binary to install (1-$$(( $$i - 1 ))): "; \
+	read choice; \
+	selected=$$(echo "$$binaries" | sed -n "$${choice}p"); \
+	if [ -z "$$selected" ]; then \
+		echo "Invalid choice '$$choice'. Installation cancelled."; exit 1; \
+	fi; \
+	mkdir -p $(INSTALL_DIR); \
+	install -m 755 $(BIN_DIR)/$$selected $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX); \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "Installed $$selected as $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)"; \
+	echo "Installation complete."
 
 uninstall:
 	rm -f $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)
