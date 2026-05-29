@@ -29,21 +29,21 @@ static void usage(const char* argv0)
 {
     printf(
      "\n" COL_BOLD "speedtest-cli" COL_RESET " - open-source network speed "
-                                             "tester\n"
+     "tester\n"
      "\n"
      "Usage:\n"
      "  %s [options]\n"
      "\n"
      "Options:\n"
      "  " COL_CYAN "--provider=<slug>" COL_RESET "   Provider to query  "
-                                                 "(default: all)\n"
+     "(default: all)\n"
      "  " COL_CYAN "--list" COL_RESET "               List available providers "
-                                      "and exit\n"
+     "and exit\n"
      "  " COL_CYAN "--ping-only" COL_RESET "          Only run TCP-connect "
-                                           "ping test\n"
+     "ping test\n"
      "  " COL_CYAN "--json" COL_RESET "               Output results as JSON\n"
      "  " COL_CYAN "--count=<n>" COL_RESET "          Ping probes per host "
-                                           "(default: 4)\n"
+     "(default: 4)\n"
      "  " COL_CYAN "--help" COL_RESET "               Show this help\n"
      "\n",
      argv0);
@@ -187,7 +187,12 @@ int main(int argc, char* argv[])
             continue;
         }
         if (strncmp(arg, "--count=", 8) == 0) {
-            count = atoi(arg + 8);
+            char* endptr;
+            count = (int)strtol(arg + 8, &endptr, 10);
+            if (*endptr != '\0') {
+                fprintf(stderr, "Invalid count: %s\n", arg + 8);
+                return 1;
+            }
             if (count < 1) {
                 count = 1;
             }

@@ -197,8 +197,9 @@ void print_result(const SpeedResult* r, const PingResult* pr,
          "Download:", r->download_mbps);
     }
     if (r->upload_mbps >= 0.0) {
-        printf(COL_BOLD "  %-12s" COL_RESET COL_MAGENTA " %.1f "
-                                                        "Mbps\n" COL_RESET,
+        printf(COL_BOLD
+         "  %-12s" COL_RESET COL_MAGENTA " %.1f "
+         "Mbps\n" COL_RESET,
          "Upload:", r->upload_mbps);
     }
 
@@ -234,7 +235,7 @@ SpeedResult run_provider(Provider p)
 
     /* 1. Connection quality metrics */
     ConnResult cr = measure_connection(def->url);
-    
+
     printf("  Measuring download speed ... ");
     fflush(stdout);
     r.download_mbps = measure_download(def->url);

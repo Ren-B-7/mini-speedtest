@@ -33,8 +33,10 @@ static void safe_str(char* dst, size_t dstsz, const cJSON* item)
 
 static void safe_str_pop(char* dst, size_t dstsz, const char* src)
 {
-    if (!src) return;
-    
+    if (!src) {
+        return;
+    }
+
     // Check if we have space for " (PoP)\0" which is 7 bytes
     if (strlen(src) + 7 <= dstsz) {
         snprintf(dst, dstsz, "%s (PoP)", src);
@@ -126,7 +128,7 @@ SpeedResult parse_ipinfo(const char* json)
     /* "loc" is "lat,lon" as a single string */
     cJSON* loc = cJSON_GetObjectItem(root, "loc");
     if (cJSON_IsString(loc) && loc->valuestring) {
-        char *endptr;
+        char* endptr;
         r.latitude = strtod(loc->valuestring, &endptr);
         if (endptr != loc->valuestring && *endptr == ',') {
             r.longitude = strtod(endptr + 1, NULL);
