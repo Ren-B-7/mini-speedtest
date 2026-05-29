@@ -50,23 +50,41 @@ typedef struct {
 /* Provider table                                                       */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Download URL notes:
+ *   Cloudflare – speed.cloudflare.com/__down is Cloudflare's own public
+ *     speed-test API; ?bytes= controls payload size (120 MB used here so the
+ *     10-second cap in measure_download() gives a meaningful Mbps reading on
+ *     fast links without wasting bandwidth on slow ones).
+ *
+ *   ip-api / ipinfo / httpbin – no public large-file CDN endpoint; fall back
+ *     to Hetzner's publicly-hosted speed-test files (explicitly provided for
+ *     bandwidth testing, no authentication required, multiple DCs available).
+ *     nbg1  = Nuremberg (EU),  ash = Ashburn (US East).
+ *
+ *   Fastly – speedtest.nyc1.fastly.net does not resolve publicly; replaced
+ *     with the same Hetzner US endpoint so the provider still exercises a
+ *     real CDN path for the ip/geo lookup while using a reliable download.
+ */
 static const ProviderDef PROVIDERS[] = {
     {PROVIDER_IPAPI, "ip-api.com", "ipapi",
         "http://ip-api.com/json/?fields=status,message,country,countryCode,"
         "regionName,city,lat,lon,isp,org,query",
-        NULL, "ip-api.com", "Accept: application/json", parse_ipapi},
-    {PROVIDER_IPINFO, "ipinfo.io", "ipinfo", "https://ipinfo.io/json", NULL,
-        "ipinfo.io", "Accept: application/json", parse_ipinfo},
+        "https://nbg1-speed.hetzner.com/100MB.bin", "ip-api.com",
+        "Accept: application/json", parse_ipapi},
+    {PROVIDER_IPINFO, "ipinfo.io", "ipinfo", "https://ipinfo.io/json",
+        "https://nbg1-speed.hetzner.com/100MB.bin", "ipinfo.io",
+        "Accept: application/json", parse_ipinfo},
     {PROVIDER_CLOUDFLARE, "Cloudflare trace", "cloudflare",
         "https://one.one.one.one/cdn-cgi/trace",
-        "https://speed.cloudflare.com/__down?bytes=15728640", "one.one.one.one",
-        NULL, parse_cloudflare},
+        "https://speed.cloudflare.com/__down?bytes=125829120",
+        "one.one.one.one", NULL, parse_cloudflare},
     {PROVIDER_FASTLY, "Fastly edge", "fastly",
         "https://api.fastly.com/public-ip-list",
-        "https://speedtest.nyc1.fastly.net/download?size=15728640",
-        "api.fastly.com", "Accept: application/json", parse_fastly},
+        "https://ash-speed.hetzner.com/100MB.bin", "api.fastly.com",
+        "Accept: application/json", parse_fastly},
     {PROVIDER_HTTPBIN, "httpbin.org", "httpbin", "https://httpbin.org/get",
-        "https://httpbin.org/stream-bytes/15728640", "httpbin.org",
+        "https://nbg1-speed.hetzner.com/100MB.bin", "httpbin.org",
         "Accept: application/json", parse_httpbin},
 };
 
