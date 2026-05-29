@@ -113,7 +113,11 @@ SpeedResult parse_ipinfo(const char* json)
     /* "loc" is "lat,lon" as a single string */
     cJSON* loc = cJSON_GetObjectItem(root, "loc");
     if (cJSON_IsString(loc) && loc->valuestring) {
-        sscanf(loc->valuestring, "%lf,%lf", &r.latitude, &r.longitude);
+        char *endptr;
+        r.latitude = strtod(loc->valuestring, &endptr);
+        if (endptr != loc->valuestring && *endptr == ',') {
+            r.longitude = strtod(endptr + 1, NULL);
+        }
     }
 
     r.valid = (r.ip[0] != '\0');
