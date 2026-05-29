@@ -43,7 +43,7 @@ static size_t discard_cb(void* ptr, size_t size, size_t nmemb, void* ud)
 
 /* ── public API ─────────────────────────────────────────────────────── */
 
-double measure_download(const char* url)
+double measure_download(const char* url, const char* const* extra_headers)
 {
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -60,6 +60,14 @@ double measure_download(const char* url)
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "speedtest-cli/1.0");
 
+    struct curl_slist* hdrs = NULL;
+    if (extra_headers) {
+        for (const char* const* h = extra_headers; *h; h++) {
+            hdrs = curl_slist_append(hdrs, *h);
+        }
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, hdrs);
+    }
+
     double start = 0.0;
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -72,6 +80,9 @@ double measure_download(const char* url)
     double end = (double)tv_end.tv_sec + ((double)tv_end.tv_usec / 1000000.0);
     double duration = end - start;
 
+    if (hdrs) {
+        curl_slist_free_all(hdrs);
+    }
     curl_easy_cleanup(curl);
 
     // Accept CURLE_WRITE_ERROR because it's how we abort early

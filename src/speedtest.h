@@ -58,7 +58,12 @@ PingResult ping_host(const char* host, int count);
 
 /* connection.c */
 ConnResult measure_connection(const char* url);
-double measure_download(const char* url);
+
+/*
+ * Measure sustained download throughput in Mbps.
+ * extra_headers: NULL-terminated array of "Header: value" strings, or NULL.
+ */
+double measure_download(const char* url, const char* const* extra_headers);
 
 /* json_parse.c */
 SpeedResult parse_ipapi(const char* json);

@@ -41,6 +41,7 @@ typedef struct {
     const char* slug;
     const char* url;
     const char* download_url_str;
+    const char* const* download_headers; /* NULL-terminated, or NULL */
     const char* ping_host_str;
     const char* accept;
     SpeedResult (*parse)(const char* body);
@@ -49,6 +50,10 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 /* Provider table                                                       */
 /* ------------------------------------------------------------------ */
+
+/* Cloudflare's __down endpoint requires a Referer to serve payload bytes */
+static const char* const CF_DOWN_HEADERS[] = {
+    "Referer: https://speed.cloudflare.com/", NULL};
 
 /*
  * Download URL notes:
@@ -70,21 +75,21 @@ static const ProviderDef PROVIDERS[] = {
     {PROVIDER_IPAPI, "ip-api.com", "ipapi",
         "http://ip-api.com/json/?fields=status,message,country,countryCode,"
         "regionName,city,lat,lon,isp,org,query",
-        "https://nbg1-speed.hetzner.com/100MB.bin", "ip-api.com",
+        "https://nbg1-speed.hetzner.com/100MB.bin", NULL, "ip-api.com",
         "Accept: application/json", parse_ipapi},
     {PROVIDER_IPINFO, "ipinfo.io", "ipinfo", "https://ipinfo.io/json",
-        "https://nbg1-speed.hetzner.com/100MB.bin", "ipinfo.io",
+        "https://nbg1-speed.hetzner.com/100MB.bin", NULL, "ipinfo.io",
         "Accept: application/json", parse_ipinfo},
     {PROVIDER_CLOUDFLARE, "Cloudflare trace", "cloudflare",
         "https://one.one.one.one/cdn-cgi/trace",
-        "https://speed.cloudflare.com/__down?bytes=125829120",
+        "https://speed.cloudflare.com/__down?bytes=125829120", CF_DOWN_HEADERS,
         "one.one.one.one", NULL, parse_cloudflare},
     {PROVIDER_FASTLY, "Fastly edge", "fastly",
         "https://api.fastly.com/public-ip-list",
-        "https://ash-speed.hetzner.com/100MB.bin", "api.fastly.com",
+        "https://ash-speed.hetzner.com/100MB.bin", NULL, "api.fastly.com",
         "Accept: application/json", parse_fastly},
     {PROVIDER_HTTPBIN, "httpbin.org", "httpbin", "https://httpbin.org/get",
-        "https://nbg1-speed.hetzner.com/100MB.bin", "httpbin.org",
+        "https://nbg1-speed.hetzner.com/100MB.bin", NULL, "httpbin.org",
         "Accept: application/json", parse_httpbin},
 };
 
@@ -271,7 +276,7 @@ SpeedResult run_provider(Provider p, const char* api_key)
         download_url = def->download_url_str;
     }
 
-    r.download_mbps = measure_download(download_url);
+    r.download_mbps = measure_download(download_url, def->download_headers);
     printf("%.2f Mbps\n", r.download_mbps);
 
     /* 2. Fetch body for parsing */
