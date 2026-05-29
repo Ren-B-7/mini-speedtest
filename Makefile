@@ -1,16 +1,15 @@
 # Project Configuration
 TARGET_NAME = speedtest
-BIN_DIR = bin
-# Profiles: dev, release, fast, tiny, minimal
-PROFILE ?= dev
 BUILD_DIR = build/$(PROFILE)
-# Hardening (Opt-in)
+BIN_DIR = bin
+PROFILE ?= dev
 HARDENED ?= 0
 
 # --- OS / Platform Detection ---
 ifeq ($(OS),Windows_NT)
     PLATFORM := windows
     EXE_SUFFIX := .exe
+    INSTALL_DIR ?= $(USERPROFILE)/.local/bin
 else
     UNAME_S := $(shell uname -s 2>/dev/null || echo unknown)
     ifeq ($(UNAME_S),Darwin)
@@ -19,33 +18,41 @@ else
         PLATFORM := linux
     endif
     EXE_SUFFIX :=
+    INSTALL_DIR ?= $(HOME)/.local/bin
 endif
 
-# --- Compiler Options ---
+# --- Compiler Detection ---
 CC = gcc
+IS_GCC := $(shell $(CC) -v 2>&1 | grep -q "gcc" && echo 1 || echo 0)
 
-# macOS-specific compiler flag
+# --- Compilation Flags ---
+POSIX_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
 ifeq ($(PLATFORM),darwin)
     DARWIN_FLAGS = -DDARWIN
 else
     DARWIN_FLAGS =
 endif
 
-# POSIX source macros
-ifeq ($(PLATFORM),windows)
-    POSIX_FLAGS =
-else
-    POSIX_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
-endif
-
-# Base CFLAGS
+# Strict compilation flags
 CFLAGS = -std=c99 $(POSIX_FLAGS) -pedantic -Wall -Wextra -Isrc -Isrc/include $(DARWIN_FLAGS)
-LDFLAGS = -lcurl -lcjson -pthread
+
+# GCC-specific warnings
+ifeq ($(IS_GCC),1)
+    GCC_FLAGS = -Wformat=2 -Wformat-security -Wnull-dereference -Wstack-protector \
+                -Wtrampolines -Walloca -Wvla -Warray-bounds=2 -Wimplicit-fallthrough=3 \
+                -Wshift-overflow=2 -Wcast-qual -Wcast-align=strict -Wconversion \
+                -Wsign-conversion -Wlogical-op -Wduplicated-cond -Wduplicated-branches \
+                -Wrestrict -Wnested-externs -Winline -Wundef -Wstrict-prototypes \
+                -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
+                -Wshadow -Wwrite-strings -Wfloat-equal -Wpointer-arith \
+                -Wbad-function-cast -Wold-style-definition
+    CFLAGS += $(GCC_FLAGS)
+endif
 
 # Hardening flags (Linux only)
 ifeq ($(PLATFORM),linux)
-    HARDENING_C = -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE
-    HARDENING_L = -Wl,-z,relro -Wl,-z,now -pie
+    HARDENING_C = -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -fstack-clash-protection -fcf-protection
+    HARDENING_L = -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -Wl,-z,separate-code -pie
 else
     HARDENING_C =
     HARDENING_L =
@@ -71,14 +78,13 @@ endif
 
 CFLAGS += $(OPTFLAGS)
 
-# --- PGO (Profile Guided Optimization) ---
+# --- PGO ---
 PGO_GEN ?= 0
+PGO_USE ?= 0
 ifeq ($(PGO_GEN),1)
     CFLAGS += -fprofile-generate
     LDFLAGS += -fprofile-generate
 endif
-
-PGO_USE ?= 0
 ifeq ($(PGO_USE),1)
     CFLAGS += -fprofile-use
     LDFLAGS += -fprofile-use
@@ -88,8 +94,9 @@ endif
 SRCS = $(wildcard src/*.c)
 OBJS = $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 TARGET = $(BIN_DIR)/$(TARGET_NAME)-$(PROFILE)$(EXE_SUFFIX)
+LDFLAGS += -lcurl -lcjson -pthread
 
-.PHONY: all clean directories format lint pgo-gen pgo-use
+.PHONY: all clean directories format lint pgo-gen pgo-use install uninstall
 
 all: directories $(TARGET)
 
@@ -120,3 +127,13 @@ pgo-gen:
 
 pgo-use:
 	@$(MAKE) PGO_USE=1 clean all
+
+# Installation
+install: all
+	mkdir -p $(INSTALL_DIR)
+	install -m 755 $(TARGET) $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)
+	@echo "Installed $(TARGET) to $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)"
+
+uninstall:
+	rm -f $(INSTALL_DIR)/$(TARGET_NAME)$(EXE_SUFFIX)
+	@echo "Uninstalled $(TARGET_NAME) from $(INSTALL_DIR)"
