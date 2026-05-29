@@ -64,3 +64,11 @@ $(BUILD_DIR)/%.o: src/%.c
 
 clean:
 	rm -rf $(BUILD_DIR) $(BIN_DIR)
+
+format:
+	@echo "Formatting C source files"
+	clang-format -style=file -i src/*.c src/include/*.h src/*.h
+
+lint:
+	@echo "Running clang-tidy analysis"
+	clang-tidy -checks=-*,bugprone-*,clang-analyzer-*,performance-* $(SRCS) -- $(CFLAGS)
