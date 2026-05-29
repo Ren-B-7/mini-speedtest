@@ -10,60 +10,62 @@
  * TTFB captures DNS + TLS overhead which pure TCP misses.
  */
 
+#include <curl/curl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <curl/curl.h>
-
 #include "speedtest.h"
 
 /* Discard response body – we only care about timing */
-static size_t discard_cb(void *ptr, size_t size, size_t nmemb, void *ud)
+static size_t discard_cb(void* ptr, size_t size, size_t nmemb, void* ud)
 {
-    (void)ptr; (void)ud;
+    (void)ptr;
+    (void)ud;
     return size * nmemb;
 }
 
 /* ── public API ─────────────────────────────────────────────────────── */
 
-ConnResult measure_connection(const char *url)
+ConnResult measure_connection(const char* url)
 {
     ConnResult result;
     memset(&result, 0, sizeof result);
 
-    CURL    *curl = curl_easy_init();
+    CURL* curl = curl_easy_init();
     if (!curl) {
         result.success = 0;
         return result;
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL,           url);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  discard_cb);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT,        15L);
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, discard_cb);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT,      "speedtest-cli/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "speedtest-cli/1.0");
     /* Allow HTTP/2 where available */
-    curl_easy_setopt(curl, CURLOPT_HTTP_VERSION,   CURL_HTTP_VERSION_2TLS);
+    curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
 
     CURLcode res = curl_easy_perform(curl);
 
     if (res == CURLE_OK) {
         double namelookup, connect_t, pretransfer, starttransfer, total;
 
-        curl_easy_getinfo(curl, CURLINFO_NAMELOOKUP_TIME,   &namelookup);
-        curl_easy_getinfo(curl, CURLINFO_CONNECT_TIME,      &connect_t);
-        curl_easy_getinfo(curl, CURLINFO_PRETRANSFER_TIME,  &pretransfer);
-        curl_easy_getinfo(curl, CURLINFO_STARTTRANSFER_TIME,&starttransfer);
-        curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME,        &total);
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE,     &result.http_code);
+        curl_easy_getinfo(curl, CURLINFO_NAMELOOKUP_TIME, &namelookup);
+        curl_easy_getinfo(curl, CURLINFO_CONNECT_TIME, &connect_t);
+        curl_easy_getinfo(curl, CURLINFO_PRETRANSFER_TIME, &pretransfer);
+        curl_easy_getinfo(curl, CURLINFO_STARTTRANSFER_TIME, &starttransfer);
+        curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &total);
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &result.http_code);
 
         /* TTFB = time from start until first response byte arrived */
-        result.ttfb_ms  = starttransfer * 1000.0;
-        result.total_ms = total         * 1000.0;
-        result.success  = 1;
+        result.ttfb_ms = starttransfer * 1000.0;
+        result.total_ms = total * 1000.0;
+        result.success = 1;
 
-        (void)namelookup; (void)connect_t; (void)pretransfer;
+        (void)namelookup;
+        (void)connect_t;
+        (void)pretransfer;
     } else {
         result.success = 0;
     }
