@@ -27,7 +27,6 @@ CC ?= gcc
 IS_CLANG := $(shell $(CC) -E -dM - < /dev/null | grep -q "__clang__" && echo 1 || echo 0)
 IS_GCC   := $(shell $(CC) -E -dM - < /dev/null | grep -q "__GNUC__" && [ $(IS_CLANG) -eq 0 ] && echo 1 || echo 0)
 
-
 # --- Compilation Flags ---
 POSIX_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
 ifeq ($(PLATFORM),darwin)
@@ -120,7 +119,8 @@ LDFLAGS += -lcurl -lcjson -pthread
 # Strip tool
 STRIP ?= strip
 
-.PHONY: all clean directories format lint pgo-gen pgo-use install uninstall compile-all
+.PHONY: all clean directories format format-c format-makefile format-ci format-makefile-ci \
+	format-c-ci lint lint-c lint-makefile pgo-gen pgo-use install uninstall compile-all 
 
 all: directories $(TARGET)
 
@@ -148,16 +148,46 @@ $(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+check-tools:
+	@command -v clang-format > /dev/null 2>&1 || \
+	    { echo "ERROR: clang-format not found. Install LLVM and ensure it is on PATH."; exit 1; }
+	@command -v clang-tidy > /dev/null 2>&1 || \
+	    { echo "ERROR: clang-tidy not found. Install LLVM and ensure it is on PATH."; exit 1; }
+	@command -v mbake > /dev/null 2>&1 || \
+	    { echo "ERROR: mbake not found. Install mbake and ensure it is on PATH."; exit 1; }
+
 clean:
 	rm -rf build bin
 
-format:
-	@echo "Formatting C source files"
-	clang-format -style=file -i src/*.c src/include/*.h src/*.h
+format: format-c format-makefile
+format-ci: format-c-ci format-makefile-ci
 
-lint:
+format-c:
+	@echo "Formatting C source files"
+	clang-format -style=file:./.clang-format -i $(SRCS_ALL) $(HDRS) $(JSON_ASSETS)
+
+format-c-ci:
+	@echo "Checking C source file formats"
+	clang-format --dry-run -style=file:./.clang-format -Werror $(SRCS_ALL) $(HDRS)
+
+format-makefile:
+	@echo "Formatting Makefile"
+	mbake format --config ./.bake.toml Makefile
+
+format-makefile-ci:
+	@echo "Checking Makefile format"
+	mbake format --config ./.bake.toml --check Makefile
+
+lint: lint-c lint-makefile
+
+lint-c:
 	@echo "Running clang-tidy analysis"
-	clang-tidy -checks=-*,bugprone-*,clang-analyzer-*,performance-* $(SRCS) -- $(CFLAGS)
+	clang-tidy -checks=-*,bugprone-*,clang-analyzer-*,performance-* \
+	$(SRCS_ALL) -- $(CFLAGS)
+
+lint-makefile:
+	@echo "Running Makefile analysis"
+	mbake validate --config ./.bake.toml Makefile
 
 # PGO targets
 pgo-gen:
