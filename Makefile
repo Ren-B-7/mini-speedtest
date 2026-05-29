@@ -25,7 +25,7 @@ endif
 CC ?= gcc
 
 IS_CLANG := $(shell $(CC) -E -dM - < /dev/null | grep -q "__clang__" && echo 1 || echo 0)
-IS_GCC   := $(shell $(CC) -E -dM - < /dev/null | grep -q "__GNUC__" && [ $(IS_CLANG) -eq 0 ] && echo 1 || echo 0)
+IS_GCC := $(shell $(CC) -E -dM - < /dev/null | grep -q "__GNUC__" && [ $(IS_CLANG) -eq 0 ] && echo 1 || echo 0)
 
 # --- Compilation Flags ---
 POSIX_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
@@ -112,6 +112,8 @@ endif
 
 # --- Files and Targets ---
 SRCS = $(wildcard src/*.c)
+HDRS = $(wildcard src/*.h) $(wildcard src/include/*.h)
+SRCS_ALL = $(SRCS) $(HDRS)
 OBJS = $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 TARGET = $(BIN_DIR)/$(TARGET_NAME)-$(PROFILE)$(EXE_SUFFIX)
 LDFLAGS += -lcurl -lcjson -pthread
@@ -120,7 +122,7 @@ LDFLAGS += -lcurl -lcjson -pthread
 STRIP ?= strip
 
 .PHONY: all clean directories format format-c format-makefile format-ci format-makefile-ci \
-	format-c-ci lint lint-c lint-makefile pgo-gen pgo-use install uninstall compile-all 
+	format-c-ci lint lint-c lint-makefile pgo-gen pgo-use install uninstall compile-all
 
 all: directories $(TARGET)
 
@@ -164,11 +166,11 @@ format-ci: format-c-ci format-makefile-ci
 
 format-c:
 	@echo "Formatting C source files"
-	clang-format -style=file:./.clang-format -i $(SRCS_ALL) $(HDRS) $(JSON_ASSETS)
+	clang-format -style=file -i $(SRCS_ALL)
 
 format-c-ci:
 	@echo "Checking C source file formats"
-	clang-format --dry-run -style=file:./.clang-format -Werror $(SRCS_ALL) $(HDRS)
+	clang-format --dry-run -style=file -Werror $(SRCS_ALL)
 
 format-makefile:
 	@echo "Formatting Makefile"
@@ -183,7 +185,7 @@ lint: lint-c lint-makefile
 lint-c:
 	@echo "Running clang-tidy analysis"
 	clang-tidy -checks=-*,bugprone-*,clang-analyzer-*,performance-* \
-	$(SRCS_ALL) -- $(CFLAGS)
+	$(SRCS) -- $(CFLAGS)
 
 lint-makefile:
 	@echo "Running Makefile analysis"
