@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "include/minicli.h"
 #include "speedtest.h"
 
 #define COL_RESET "\033[0m"
@@ -61,35 +62,6 @@ static const PingEntry PING_TABLE[] = {
 };
 static const int PING_TABLE_LEN =
  (int)(sizeof PING_TABLE / sizeof PING_TABLE[0]);
-
-/* ------------------------------------------------------------------ */
-/* Help                                                                 */
-/* ------------------------------------------------------------------ */
-
-static void usage(const char* argv0)
-{
-    printf(
-     "\n" COL_BOLD "speedtest-cli" COL_RESET " - open-source network speed "
-     "tester\n"
-     "\n"
-     "Usage:\n"
-     "  %s [options]\n"
-     "\n"
-     "Options:\n"
-     "  " COL_CYAN "--provider=<slug>" COL_RESET "   Provider to query  "
-     "(default: all)\n"
-     "  " COL_CYAN "--list" COL_RESET "               List available providers "
-     "and exit\n"
-     "  " COL_CYAN "--ping-only" COL_RESET "          Only run TCP-connect "
-     "ping test\n"
-     "  " COL_CYAN "--json" COL_RESET "               Output results as JSON\n"
-     "  " COL_CYAN "--count=<n>" COL_RESET "          Ping probes per host "
-     "(default: 4)\n"
-     "  " COL_CYAN "--api-key=<key>" COL_RESET "      API key for providers\n"
-     "  " COL_CYAN "--help" COL_RESET "               Show this help\n"
-     "\n",
-     argv0);
-}
 
 /* ------------------------------------------------------------------ */
 /* JSON output helper                                                   */
@@ -173,66 +145,84 @@ static void run_ping_only(PingOptions opts)
 }
 
 /* ------------------------------------------------------------------ */
-/* Argument Parsing                                                     */
+/* CLI Callbacks                                                        */
 /* ------------------------------------------------------------------ */
 
-static int parse_args(int argc, char* argv[], SpeedtestConfig* config)
+static int provider_cb(int argc, char** argv, void* user_data)
 {
-    for (int i = 1; i < argc; i++) {
-        const char* arg = argv[i];
-
-        if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
-            usage(argv[0]);
-            return 0; // Exit successfully
-        }
-        if (strcmp(arg, "--list") == 0) {
-            list_providers();
-            return 0; // Exit successfully
-        }
-        if (strcmp(arg, "--ping-only") == 0) {
-            config->ping_only = true;
-            continue;
-        }
-        if (strcmp(arg, "--json") == 0) {
-            config->json_mode = true;
-            continue;
-        }
-
-        if (strncmp(arg, "--provider=", 11) == 0) {
-            const char* slug = arg + 11;
-            config->chosen = provider_from_string(slug);
-            if (config->chosen == PROVIDER_UNKNOWN) {
-                fprintf(stderr, "Unknown provider: %s\n", slug);
-                list_providers();
-                return -1;
-            }
-            continue;
-        }
-        if (strncmp(arg, "--count=", 8) == 0) {
-            char* endptr;
-            config->count = (int)strtol(arg + 8, &endptr, 10);
-            if (*endptr != '\0') {
-                fprintf(stderr, "Invalid count: %s\n", arg + 8);
-                return -1;
-            }
-            if (config->count < 1) {
-                config->count = 1;
-            }
-            if (config->count > MAX_PING_COUNT) {
-                config->count = MAX_PING_COUNT;
-            }
-            continue;
-        }
-        if (strncmp(arg, "--api-key=", 10) == 0) {
-            config->api_key = arg + 10;
-            continue;
-        }
-
-        fprintf(stderr, "Unknown option: %s\n", arg);
-        usage(argv[0]);
-        return -1;
+    SpeedtestConfig* config = (SpeedtestConfig*)user_data;
+    if (argc < 1) {
+        fprintf(stderr, "Error: Provider slug missing.\n");
+        return 0;
     }
-    return 1; // Continue execution
+    config->chosen = provider_from_string(argv[0]);
+    if (config->chosen == PROVIDER_UNKNOWN) {
+        fprintf(stderr, "Unknown provider: %s\n", argv[0]);
+        list_providers();
+        exit(1);
+    }
+    return 1;
+}
+
+static int list_cb(int argc, char** argv, void* user_data)
+{
+    (void)argc;
+    (void)argv;
+    (void)user_data;
+    list_providers();
+    exit(0);
+    return 0;
+}
+
+static int ping_only_cb(int argc, char** argv, void* user_data)
+{
+    (void)argc;
+    (void)argv;
+    SpeedtestConfig* config = (SpeedtestConfig*)user_data;
+    config->ping_only = true;
+    return 0;
+}
+
+static int json_cb(int argc, char** argv, void* user_data)
+{
+    (void)argc;
+    (void)argv;
+    SpeedtestConfig* config = (SpeedtestConfig*)user_data;
+    config->json_mode = true;
+    return 0;
+}
+
+static int count_cb(int argc, char** argv, void* user_data)
+{
+    SpeedtestConfig* config = (SpeedtestConfig*)user_data;
+    if (argc < 1) {
+        fprintf(stderr, "Error: Count missing.\n");
+        return 0;
+    }
+    char* endptr;
+    config->count = (int)strtol(argv[0], &endptr, 10);
+    if (*endptr != '\0') {
+        fprintf(stderr, "Invalid count: %s\n", argv[0]);
+        exit(1);
+    }
+    if (config->count < 1) {
+        config->count = 1;
+    }
+    if (config->count > MAX_PING_COUNT) {
+        config->count = MAX_PING_COUNT;
+    }
+    return 1;
+}
+
+static int api_key_cb(int argc, char** argv, void* user_data)
+{
+    SpeedtestConfig* config = (SpeedtestConfig*)user_data;
+    if (argc < 1) {
+        fprintf(stderr, "Error: API key missing.\n");
+        return 0;
+    }
+    config->api_key = argv[0];
+    return 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -244,17 +234,29 @@ int main(int argc, char* argv[])
     SpeedtestConfig config = {
         PROVIDER_ALL, false, false, DEFAULT_PING_COUNT, NULL};
 
-    int status = parse_args(argc, argv, &config);
-    if (status <= 0) {
-        return (status == 0) ? 0 : 1;
-    }
+    CliParser parser;
+    CliInitParams params = {"speedtest", "open-source network speed tester"};
+    cli_init(&parser, params);
 
-    if (!config.json_mode) {
-        printf(COL_BOLD
-         "\n+----------------------------------+\n"
-         "|      speedtest-cli  v1.0         |\n"
-         "+----------------------------------+\n" COL_RESET);
-    }
+    cli_add_argument(&parser,
+     (CliArgument){"--provider", "-p", "Provider to query (default: all)",
+         provider_cb, &config});
+    cli_add_argument(&parser,
+     (CliArgument){
+         "--list", "-l", "List available providers and exit", list_cb, NULL});
+    cli_add_argument(&parser,
+     (CliArgument){"--ping-only", NULL, "Only run TCP-connect ping test",
+         ping_only_cb, &config});
+    cli_add_argument(&parser,
+     (CliArgument){"--json", "-j", "Output results as JSON", json_cb, &config});
+    cli_add_argument(&parser,
+     (CliArgument){"--count", "-c", "Ping probes per host (default: 4)",
+         count_cb, &config});
+    cli_add_argument(&parser,
+     (CliArgument){
+         "--api-key", "-k", "API key for providers", api_key_cb, &config});
+
+    cli_parse(&parser, argc, argv);
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
@@ -262,6 +264,7 @@ int main(int argc, char* argv[])
         PingOptions opts = {config.chosen, config.count, config.json_mode};
         run_ping_only(opts);
         curl_global_cleanup();
+        cli_destroy(&parser);
         return 0;
     }
 
@@ -288,5 +291,6 @@ int main(int argc, char* argv[])
     }
 
     curl_global_cleanup();
+    cli_destroy(&parser);
     return 0;
 }

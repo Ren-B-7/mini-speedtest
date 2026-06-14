@@ -1,6 +1,7 @@
 #ifndef MINICLI_H
 #define MINICLI_H
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -166,8 +167,12 @@ cli_print_completions(const CliParser* parser, const char* shell)
 
 static inline int cli_parse(CliParser* parser, int argc, char** argv)
 {
+    int first_non_option = -1;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
+            if (first_non_option == -1) {
+                first_non_option = i;
+            }
             continue;
         }
         bool found = false;
@@ -186,7 +191,7 @@ static inline int cli_parse(CliParser* parser, int argc, char** argv)
             /* Unknown option, ignore for now or handle as needed */
         }
     }
-    return 0;
+    return (first_non_option == -1) ? argc : first_non_option;
 }
 
 static inline void cli_destroy(CliParser* parser)

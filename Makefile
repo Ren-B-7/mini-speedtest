@@ -111,10 +111,11 @@ ifeq ($(PGO_USE),1)
 endif
 
 # --- Files and Targets ---
-SRCS = $(wildcard src/*.c)
+SRCS = $(wildcard src/*.c) src/include/set.c
 HDRS = $(wildcard src/*.h) $(wildcard src/include/*.h)
 SRCS_ALL = $(SRCS) $(HDRS)
 OBJS = $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
+OBJS := $(OBJS:src/include/set.c=$(BUILD_DIR)/set.o)
 TARGET = $(BIN_DIR)/$(TARGET_NAME)-$(PROFILE)$(EXE_SUFFIX)
 LDFLAGS += -lcurl -lcjson -pthread
 
@@ -145,6 +146,10 @@ $(TARGET): $(OBJS)
 		echo "Stripping $@"; \
 		$(STRIP) $@; \
 	fi
+
+$(BUILD_DIR)/set.o: src/include/set.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
